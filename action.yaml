@@ -82,16 +82,19 @@ runs:
         username: ${{inputs.registry_username}}
         password: ${{inputs.registry_password}}
     - name: Setup GitVersion
-      uses: gittools/actions/gitversion/setup-gitversion@v3.0
+      uses: gittools/actions/gitversion/setup@v3.0.2
       with:
         versionSpec: '6.x'
+
+    - name: Determine Version
+      id: version_step # step id used as reference for output values
+      uses: gittools/actions/gitversion/execute@v3.0.2
     - id: get-version
       name: Get Version
       shell: bash
       run: |
-
         echo "REARM_BUILD_START=$(date -Iseconds)" >> $GITHUB_ENV
-        rearm_ver=$(gitversion /showvariable FullSemVer)
+        rearm_ver=${{ env.fullSemVer }}
         echo "REARM_VERSION=$rearm_ver" >> $GITHUB_ENV
     - name: Instantiate Rearm status as Rejected to handle possible build failure
       shell: bash
