@@ -85,6 +85,38 @@ runs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 200
+    - name: Extract Last Release Commit And Prepare List Of Commits
+      id: extract-commits
+      shell: bash
+      run: |
+        set -e
+        set -x
+        cd ${{ inputs.path }}
+        dobuild=false
+        echo -n "-i ${{ inputs.rearm_api_id }} -k ${{ inputs.rearm_api_key }} -u ${{ inputs.rearm_api_url }} -b ${{github.ref_name}}"  > get_latest_release_cmd
+        if [ ! -z ${{inputs.rearm_project_id}} ]
+        then
+          echo " --component ${{inputs.rearm_project_id}} " >> get_latest_release_cmd
+        fi
+        
+        echo -n "rearm getlatestrelease $(cat get_latest_release_cmd) " >> get_latest_release_exec
+        latest_release=$(eval "$(cat get_latest_release_exec)")
+        echo "latest_release: $latest_release"
+        last_commit=$(echo $latest_release | jq -r ".sourceCodeEntryDetails.commit")
+        if [ ! -z "$last_commit" ] && [ "null" != "$last_commit" ]
+        then
+          difflines=$(git diff $last_commit..${{github.sha}} ./ | wc -l)
+          if [ "$difflines" != "0" ]
+          then
+            dobuild=true
+          fi
+        else
+          dobuild=true
+        fi
+        echo "DO_BUILD=$dobuild" >> $GITHUB_ENV
+        echo "LAST_COMMIT=$last_commit" >> $GITHUB_ENV
+        echo "REARM_DO_BUILD=$dobuild" >> $GITHUB_ENV
+        echo "rearm_last_commit=$last_commit" >> $GITHUB_OUTPUT
     - name: Setup GitVersion
       uses: gittools/actions/gitversion/setup@v3.0.2
       with:
@@ -104,7 +136,6 @@ runs:
       shell: bash
       run: |
         echo "REARM_BUILD_STATUS=rejected" >> $GITHUB_ENV
-        echo "REARM_DO_BUILD=true" >> $GITHUB_ENV
     - name: Validate input list
       shell: bash
       run: |
@@ -198,3 +229,5 @@ runs:
         registry_password: ${{inputs.registry_password}}
         registry_host: ${{inputs.registry_host}}
         path: ${{inputs.path}}
+        send_sce_data: 'true'
+        last_commit: $LAST_COMMIT
